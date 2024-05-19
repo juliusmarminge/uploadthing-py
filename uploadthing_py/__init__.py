@@ -1,7 +1,7 @@
 from typing import Final
 
-from utpy.utapi import UTApi
-from utpy.types import *
+from uploadthing_py.utapi import UTApi
+from uploadthing_py.types import *
 
 __version__: Final[str] = "0.1.0"
 

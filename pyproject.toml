@@ -1,9 +1,12 @@
 [tool.poetry]
-name = "utpy"
-version = "0.1.0"
+name = "uploadthing.py"
+version = "0.1.1"
 description = "Python SDK for UploadThing"
 authors = ["juliusmarminge <julius0216@outlook.com>"]
 readme = "README.md"
+packages = [{ include = "uploadthing_py" }]
+license = "MIT"
+
 
 [tool.poetry.dependencies]
 python = "^3.12"

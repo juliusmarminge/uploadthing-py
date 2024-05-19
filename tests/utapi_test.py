@@ -1,5 +1,5 @@
 import pytest
-from utpy import UTApi, File, GetUsageInfo, GetSignedUrl
+from uploadthing_py import UTApi, File, GetUsageInfo, GetSignedUrl
 import logging
 
 API_KEY = "sk_"

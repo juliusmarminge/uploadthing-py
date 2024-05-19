@@ -1,8 +1,8 @@
 import typing as t, logging
 from httpx import AsyncClient, Response
 
-import utpy
-from utpy.types import (
+import uploadthing_py
+from uploadthing_py.types import (
     ACL,
     MaybeList,
     File,
@@ -13,7 +13,7 @@ from utpy.types import (
     GetSignedUrl,
     UpdateACL,
 )
-from utpy.utils import json_stringify, del_none
+from uploadthing_py.utils import json_stringify, del_none
 
 
 class HttpError(Exception):
@@ -45,13 +45,13 @@ class UTApi:
             base_url=base_url,
             headers={
                 "x-uploadthing-api-key": self._api_key,
-                "x-uploadthing-be-adapter": f"utpy@{utpy.__version__}",
+                "x-uploadthing-be-adapter": f"uploadthing_py@{uploadthing_py.__version__}",
                 "x-uploadthing-version": "6.10.0",
             },
         )
         self._baseUrl = base_url
         self._default_key_type = key_type
-        self._logger = logging.getLogger("UTPY")
+        self._logger = logging.getLogger("uploadthing_py")
 
     async def _request_ut_api(self, path: str, payload: t.Dict = None) -> t.Dict:
         stringified = json_stringify(del_none(payload or {}))
