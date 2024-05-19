@@ -70,6 +70,11 @@ class UTApi:
 
         return response.json()
 
+    async def upload_files(
+        self, files: MaybeList[t.Any], options: t.Optional[t.Any] = None
+    ):
+        raise NotImplementedError
+
     async def delete_files(
         self,
         keys: MaybeList[str],
