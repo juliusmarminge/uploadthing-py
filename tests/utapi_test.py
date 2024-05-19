@@ -1,11 +1,7 @@
 import pytest
 from uploadthing_py import UTApi, File, GetUsageInfo, GetSignedUrl
-import logging
 
 API_KEY = "sk_"
-
-
-logger = logging.getLogger()
 
 
 class TestDeleteFiles:
