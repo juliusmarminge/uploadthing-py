@@ -1,3 +1,11 @@
+# Installation
+
+```sh
+pip install uploadthing.py
+```
+
+# Quickstart
+
 ```py
 import asyncio, os
 
