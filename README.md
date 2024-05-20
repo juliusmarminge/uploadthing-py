@@ -42,7 +42,11 @@ You can use FastAPI like any of the JavaScript backend adapters.
 
 > [!TIP]
 >
-> You can use this example along with one of the [client examples](https://github.com/pingdotgg/uploadthing/tree/main/examples/backend-adapters) and just switch the [`BACKEND_URL` port](https://github.com/pingdotgg/uploadthing/blob/main/examples/backend-adapters/client-react/src/constants.ts) to 8000 (default port for uvicorn) 
+> You can use this example along with one of the [client examples](https://github.com/pingdotgg/uploadthing/tree/main/examples/backend-adapters)
+>
+> ```sh
+> UPLOADTHING_SECRET=sk_foo poetry run uvicorn examples.fastapi:app --reload --port 3000
+> ```
 
 > [!WARNING]
 >
