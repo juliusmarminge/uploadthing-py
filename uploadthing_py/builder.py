@@ -14,10 +14,6 @@ class UploadThingBuilder:
         self.config.update(config)
         return self
 
-    def image(self, **kwargs):
-        self.config["image"] = kwargs
-        return self
-
     def middleware(self, func: Callable):
         self.callbacks["middleware"] = func
         return self
