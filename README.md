@@ -17,7 +17,7 @@ from uploadthing_py import UTApi
 
 
 async def main():
-    utapi = UTApi(os.environ["UTAPI_KEY"])
+    utapi = UTApi(os.getenv("UPLOADTHING_SECRET"))
 
     # List the files in your app
     res = await utapi.list_files()
