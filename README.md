@@ -55,8 +55,8 @@ You can use FastAPI like any of the JavaScript backend adapters.
 ```py
 from fastapi import FastAPI, Request, Response
 from uploadthing_py import (
-    create_uploadthing,
     UploadThingRequestBody,
+    create_uploadthing,
     create_route_handler,
 )
 from fastapi.middleware.cors import CORSMiddleware
