@@ -40,7 +40,13 @@ if __name__ == "__main__":
 
 You can use FastAPI like any of the JavaScript backend adapters.
 
-> Note: This is a work in progress and not yet ready for production use.
+> [!TIP]
+>
+> You can use this example along with one of the [client examples](https://github.com/pingdotgg/uploadthing/tree/main/examples/backend-adapters) and just switch the [`BACKEND_URL` port](https://github.com/pingdotgg/uploadthing/blob/main/examples/backend-adapters/client-react/src/constants.ts) to 8000 (default port for uvicorn) 
+
+> [!WARNING]
+>
+> This is a work in progress and not yet ready for production use.
 
 ```py
 from fastapi import FastAPI, Request, Response
