@@ -8,7 +8,7 @@ from uploadthing_py.types import (
     File,
     ListFiles,
     DeleteFiles,
-    RenameFile,
+    RenameFiles,
     GetUsageInfo,
     GetSignedUrl,
     UpdateACL,
@@ -99,7 +99,7 @@ class UTApi:
 
         return files
 
-    async def rename_files(self, updates: RenameFile.RenameFileOptions):
+    async def rename_files(self, updates: RenameFiles.RenameFileOptions):
         if not isinstance(updates, t.List):
             updates = [updates]
         self._logger.debug(f"Rename files: {updates}")
@@ -122,7 +122,7 @@ class UTApi:
         api_response = await self._request_ut_api(
             "/v6/renameFiles", {"updates": updates}
         )
-        response = RenameFile.RenameFileResponse(**api_response)
+        response = RenameFiles.RenameFileResponse(**api_response)
 
         return response
 
