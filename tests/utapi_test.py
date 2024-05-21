@@ -10,12 +10,14 @@ class TestDeleteFiles:
         client = UTApi(API_KEY)
         response = await client.delete_files("test")
         assert response.success
+        assert type(response.deleted_count) == int
 
     @pytest.mark.asyncio
     async def test_delete_files_multiple(self):
         client = UTApi(API_KEY)
         response = await client.delete_files(["test", "test2"])
         assert response.success
+        assert type(response.deleted_count) == int
 
 
 class TestListFiles:
@@ -57,7 +59,9 @@ class TestGetSignedUrl:
     @pytest.mark.asyncio
     async def test_get_signed_url(self):
         client = UTApi(API_KEY)
-        response = await client.get_signed_url("test")
+        response = await client.get_signed_url(
+            "de79dd66-e99b-45e0-9430-ccba4a8c9668-eh6k28.heic"
+        )
         assert isinstance(response, GetSignedUrl.GetSignedUrlResponse)
 
 

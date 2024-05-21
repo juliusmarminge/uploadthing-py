@@ -87,7 +87,7 @@ class UTApi:
         payload = {"fileKeys": keys} if key_type == "file_key" else {"customIds": keys}
 
         api_response = await self._request_ut_api("/v6/deleteFiles", payload)
-        response = DeleteFiles.DeleteFileResponse(**api_response)
+        response = DeleteFiles.DeleteFileResponse.from_api_response(api_response)
 
         return response
 

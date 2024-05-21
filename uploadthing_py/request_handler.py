@@ -3,7 +3,6 @@ from httpx import AsyncClient
 from uploadthing_py.utils import json_stringify
 from uploadthing_py.builder import UploadThingBuilder
 import asyncio
-import json
 from uploadthing_py.types import (
     UploadRequest,
     CallbackRequest,
@@ -45,13 +44,14 @@ def extract_router_config(router: dict[str, UploadThingBuilder]):
     return routes
 
 
-async def dev_hook(key: str, api_key: str):
+async def dev_hook(presigned: dict, api_key: str):
     retry_delay = 40e-3
     async with AsyncClient() as client:
         while True:
             response = await client.get(
-                f"https://api.uploadthing.com/v6/pollUpload/{key}",
+                presigned["pollingUrl"],
                 headers={
+                    "Authorization": presigned["pollingJwt"],
                     "x-uploadthing-api-key": api_key,
                     "x-uploadthing-version": "6.10.0",
                 },
@@ -63,19 +63,19 @@ async def dev_hook(key: str, api_key: str):
             await asyncio.sleep(retry_delay)
             retry_delay *= 2
 
-        file_data = polling_data["fileData"]
-        callback_url = f"{file_data['callbackUrl']}?slug={file_data['callbackSlug']}"
+        file = polling_data["file"]
+        callback_url = f"{file['callbackUrl']}?slug={file['callbackSlug']}"
         payload = json_stringify(
             {
                 "status": "uploaded",
-                "metadata": json.loads(file_data["metadata"]),
+                "metadata": polling_data["metadata"],
                 "file": {
-                    "url": f"https://utfs.io/f/{key}",
-                    "key": key,
-                    "name": file_data["fileName"],
-                    "size": file_data["fileSize"],
-                    "custom_id": file_data["customId"],
-                    "type": file_data["fileType"],
+                    "url": file["fileUrl"],
+                    "key": file["fileKey"],
+                    "name": file["fileName"],
+                    "size": file["fileSize"],
+                    "custom_id": file["customId"],
+                    "type": file["fileType"],
                 },
             }
         )
@@ -156,7 +156,7 @@ async def handle_upload_request(
 
         if is_dev:
             asyncio.gather(
-                *[dev_hook(presigned["key"], api_key) for presigned in presigned_urls]
+                *[dev_hook(presigned, api_key) for presigned in presigned_urls]
             )
 
         return presigned_urls
@@ -285,13 +285,13 @@ def create_route_handler(
     @app.get("/api")
     async def greeting():
         return "Hello from FastAPI"
-    
-    
+
+        
     @app.get("/api/uploadthing")
     async def ut_get():
         return handlers["GET"]()
-    
-    
+
+
     @app.post("/api/uploadthing")
     async def ut_post(
         request: Request,
@@ -305,7 +305,7 @@ def create_route_handler(
         )
     ```
     """
-    
+
     def ut_get():
         return extract_router_config(router)
 

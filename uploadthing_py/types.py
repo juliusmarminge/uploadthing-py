@@ -42,7 +42,17 @@ class DeleteFiles:
 
     @dataclass
     class DeleteFileResponse:
+        deleted_count: int
         success: bool
+
+        @classmethod
+        def from_api_response(
+            cls, api_response: dict
+        ) -> "DeleteFiles.DeleteFileResponse":
+            return DeleteFiles.DeleteFileResponse(
+                deleted_count=api_response["deletedCount"],
+                success=api_response["success"],
+            )
 
 
 class ListFiles:
@@ -108,6 +118,7 @@ class GetSignedUrl:
     class GetSignedUrlOptions(KeyTypeOptions):
         expires_in: int | None = None
 
+    @dataclass
     class GetSignedUrlResponse:
         url: str
 
