@@ -1,6 +1,16 @@
 name: Release
 
-on: workflow_dispatch
+on: 
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: Release type
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+
 
 jobs:
   release:
@@ -21,11 +31,20 @@ jobs:
       - name: Build and publish
         run: |
           poetry config pypi-token.pypi "${{secrets.PYPI_TOKEN}}"
+          poetry version ${{ inputs.release_type }}
           poetry build
           poetry publish --no-interaction
 
       - name: Generate release tag
         run: echo "RELEASE_TAG=v$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
+
+      - name: Commit release tag
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "Release ${{ env.RELEASE_TAG }}"
+          git push
 
       - name: Create a Release
         uses: elgohr/Github-Release-Action@v5
