@@ -1,7 +1,10 @@
 import pytest
 from uploadthing_py import UTApi, File, GetUsageInfo, GetSignedUrl
+import os
 
-API_KEY = "sk_"
+API_KEY = os.getenv("UPLOADTHING_SECRET")
+if not API_KEY:
+    raise Exception("Please set the UPLOADTHING_SECRET environment variable")
 
 
 class TestDeleteFiles:
