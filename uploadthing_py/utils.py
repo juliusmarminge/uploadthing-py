@@ -1,4 +1,6 @@
 import dataclasses, json, typing as t
+import hmac
+from hashlib import sha256
 
 
 def json_stringify(o):
@@ -8,7 +10,7 @@ def json_stringify(o):
                 return dataclasses.asdict(o)
             return super().default(o)
 
-    return EnhancedJSONEncoder().encode(o)
+    return json.dumps(o, cls=EnhancedJSONEncoder, separators=(",", ":"))
 
 
 def del_none(d: t.Any):
@@ -22,3 +24,23 @@ def del_none(d: t.Any):
         elif isinstance(value, dict):
             del_none(value)
     return d  # For convenience
+
+
+signature_prefix = "hmac-sha256="
+
+
+def sign_payload(payload: str, secret: str) -> str:
+    signature = hmac.new(secret.encode(), payload.encode(), sha256).hexdigest()
+    return f"{signature_prefix}{signature}"
+
+
+def verify_signature(payload: str, signature: str, secret: str) -> bool:
+    if not signature or not signature.startswith(signature_prefix):
+        return False
+
+    sig = signature[len(signature_prefix) :]
+    if not sig:
+        return False
+
+    hmac_obj = hmac.new(secret.encode(), payload.encode(), sha256).hexdigest()
+    return hmac.compare_digest(hmac_obj, sig)

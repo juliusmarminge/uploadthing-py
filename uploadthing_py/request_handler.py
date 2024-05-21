@@ -1,6 +1,6 @@
 from fastapi import Request, Response
 from httpx import AsyncClient
-from uploadthing_py.utils import json_stringify
+from uploadthing_py.utils import json_stringify, sign_payload, verify_signature
 from uploadthing_py.builder import UploadThingBuilder
 import asyncio
 from uploadthing_py.types import (
@@ -80,8 +80,7 @@ async def dev_hook(presigned: dict, api_key: str):
             }
         )
 
-        # (TODO) Sign payload
-        signature = "TODO"
+        signature = sign_payload(payload, api_key)
 
         callback_response = await client.post(
             callback_url,
@@ -163,9 +162,14 @@ async def handle_upload_request(
 
 
 async def handle_callback_request(
-    uploader: UploadThingBuilder, body: CallbackRequest, api_key: str
+    uploader: UploadThingBuilder, request: Request, body: CallbackRequest, api_key: str
 ):
-    # (TODO) Validate payload signature
+    if not verify_signature(
+        (await request.body()).decode("utf-8"),
+        request.headers["x-uploadthing-signature"],
+        api_key,
+    ):
+        return {"error": "Invalid signature"}
 
     try:
         server_data = uploader.callbacks["on_upload_complete"](
@@ -286,7 +290,7 @@ def create_route_handler(
     async def greeting():
         return "Hello from FastAPI"
 
-        
+
     @app.get("/api/uploadthing")
     async def ut_get():
         return handlers["GET"]()
@@ -342,7 +346,7 @@ def create_route_handler(
         match [uploadthing_hook, action_type]:
             case ["callback", None]:
                 return await handle_callback_request(
-                    uploader=uploader, body=body, api_key=api_key
+                    uploader=uploader, request=request, body=body, api_key=api_key
                 )
             case [None, "upload"]:
                 return await handle_upload_request(
