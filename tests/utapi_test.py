@@ -2,9 +2,9 @@ import pytest
 from uploadthing_py import UTApi, File, GetUsageInfo, GetSignedUrl
 import os
 
-API_KEY = os.getenv("UPLOADTHING_SECRET")
+API_KEY = os.getenv("UPLOADTHING_TEST_SECRET")
 if not API_KEY:
-    raise Exception("Please set the UPLOADTHING_SECRET environment variable")
+    raise Exception("Please set the UPLOADTHING_TEST_SECRET environment variable")
 
 
 class TestDeleteFiles:
@@ -63,7 +63,7 @@ class TestGetSignedUrl:
     async def test_get_signed_url(self):
         client = UTApi(API_KEY)
         response = await client.get_signed_url(
-            "de79dd66-e99b-45e0-9430-ccba4a8c9668-eh6k28.heic"
+            "7337d5a2-7c2c-45fa-818f-662586045897-eh6k28.heic"
         )
         assert isinstance(response, GetSignedUrl.GetSignedUrlResponse)
 

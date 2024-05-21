@@ -1,0 +1,41 @@
+
+name: Test
+  
+on:
+    push:
+        branches:
+        - main
+    pull_request:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+          
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+
+      - name: Install Poetry
+        run: curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Set up Poetry environment
+        run: poetry install --no-root
+
+    #   - name: Run mypy
+    #     run: |
+    #       poetry run mypy --show-error-codes .
+
+      - name: Run tests
+        run: |
+          export UPLOADTHING_TEST_SECRET="${{secrets.UPLOADTHING_TEST_SECRET}}"
+          poetry run pytest
