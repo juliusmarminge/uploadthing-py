@@ -1,4 +1,5 @@
-import typing as t, logging
+import typing as t
+import logging
 from httpx import AsyncClient, Response
 
 import uploadthing_py

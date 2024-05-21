@@ -1,4 +1,6 @@
-import dataclasses, json, typing as t
+import dataclasses
+import json
+import typing as t
 import hmac
 from hashlib import sha256
 

@@ -2,7 +2,8 @@
 Simple example of using the library.
 """
 
-import asyncio, os
+import asyncio
+import os
 
 from uploadthing_py import UTApi
 

@@ -13,14 +13,14 @@ class TestDeleteFiles:
         client = UTApi(API_KEY)
         response = await client.delete_files("test")
         assert response.success
-        assert type(response.deleted_count) == int
+        assert isinstance(response.deleted_count, int)
 
     @pytest.mark.asyncio
     async def test_delete_files_multiple(self):
         client = UTApi(API_KEY)
         response = await client.delete_files(["test", "test2"])
         assert response.success
-        assert type(response.deleted_count) == int
+        assert isinstance(response.deleted_count, int)
 
 
 class TestListFiles:
