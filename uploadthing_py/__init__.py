@@ -8,6 +8,7 @@ from uploadthing_py.types import (
     GetUsageInfo,
     GetSignedUrl,
     UpdateACL,
+    UploadFiles,
     UploadThingRequestBody,
 )
 from uploadthing_py.request_handler import create_route_handler, extract_router_config
@@ -28,5 +29,6 @@ __all__ = [
     "GetUsageInfo",
     "GetSignedUrl",
     "UpdateACL",
+    "UploadFiles",
     "UploadThingRequestBody",
 ]

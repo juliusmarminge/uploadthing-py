@@ -1,6 +1,8 @@
 import typing as t
 import logging
-from httpx import AsyncClient, Response
+from httpx import AsyncClient, Response, put
+from base64 import b64decode
+
 
 import uploadthing_py
 from uploadthing_py.types import (
@@ -13,8 +15,15 @@ from uploadthing_py.types import (
     GetUsageInfo,
     GetSignedUrl,
     UpdateACL,
+    UploadFiles,
 )
-from uploadthing_py.utils import json_stringify, del_none
+from uploadthing_py.utils import (
+    json_stringify,
+    json_parse,
+    del_none,
+    generate_signed_url,
+    generate_key,
+)
 
 
 class HttpError(Exception):
@@ -37,17 +46,26 @@ class UTApi:
 
     def __init__(
         self,
-        api_key: str,
+        token: str,
         key_type: t.Literal["file_key", "custom_id"] = "file_key",
         base_url: str = "https://api.uploadthing.com",
+        ingest_host: str = "ingest.uploadthing.com",
     ):
-        self._api_key = api_key
+        # Decode and parse token
+        decoded_token = json_parse(b64decode(token).decode("utf-8"))
+        self._api_key = decoded_token["apiKey"]
+        self._app_id = decoded_token["appId"]
+        region = decoded_token["regions"][0]
+        if "ingestHost" in decoded_token:
+            ingest_host = decoded_token["ingestHost"]
+        self._ingest_url = f"https://{region}.{ingest_host}"
+
         self._client = AsyncClient(
             base_url=base_url,
             headers={
                 "x-uploadthing-api-key": self._api_key,
                 "x-uploadthing-be-adapter": f"uploadthing_py@{uploadthing_py.__version__}",
-                "x-uploadthing-version": "6.10.0",
+                "x-uploadthing-version": "7.0.3",
             },
         )
         self._baseUrl = base_url
@@ -72,9 +90,47 @@ class UTApi:
         return response.json()
 
     async def upload_files(
-        self, files: MaybeList[t.Any], options: t.Optional[t.Any] = None
+        self, files: MaybeList[t.Any], options: t.Optional[t.Any] = {}
     ):
-        raise NotImplementedError
+        if not isinstance(files, t.List):
+            files = [files]
+
+        cd = (
+            options.content_disposition
+            if "content_disposition" in options
+            else "inline"
+        )
+        acl = options.acl if "acl" in options else "public-read"
+
+        presigned_urls: t.List[t.Dict[str, str]] = []
+        for file in files:
+            key = generate_key(file, self._app_id)
+            url = f"{self._ingest_url}/{key}"
+            data = {
+                "x-ut-identifier": self._app_id,
+                "x-ut-file-name": file["name"],
+                "x-ut-file-size": file["size"],
+                "x-ut-file-type": file["type"],
+                # "x-ut-custom-id": None,
+                "x-ut-content-disposition": cd,
+                "x-ut-acl": acl,
+            }
+            signed_url = generate_signed_url(url, self._api_key, data=data)
+            presigned_urls.append({"url": signed_url, "key": key})
+
+        print("URLs", presigned_urls)
+
+        # TODO: Add some parallelism here to upload multiple files at once
+        for file in files:
+            presigned = presigned_urls.pop(0)
+            url = presigned["url"]
+            key = presigned["key"]
+
+            with open(file["name"], "rb") as f:
+                response = put(url, files={"file": f})
+                print("UPLOAD RESOPNSE", response, response.json())
+
+        return UploadFiles.UploadFileResponse(False)
 
     async def delete_files(
         self,

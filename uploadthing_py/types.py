@@ -132,6 +132,16 @@ class UpdateACL:
         success: bool
 
 
+class UploadFiles:
+    class UploadFileOptions(KeyTypeOptions):
+        content_disposition: str | None = None
+        acl: ACL | None = None
+
+    @dataclass
+    class UploadFileResponse:
+        success: bool
+
+
 #
 # Handler Types
 #
