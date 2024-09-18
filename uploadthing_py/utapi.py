@@ -118,7 +118,7 @@ class UTApi:
             signed_url = generate_signed_url(url, self._api_key, data=data)
             presigned_urls.append({"url": signed_url, "key": key})
 
-        print("URLs", presigned_urls)
+        responses: t.List[UploadFiles.UploadFileResponse] = []
 
         # TODO: Add some parallelism here to upload multiple files at once
         for file in files:
@@ -129,8 +129,11 @@ class UTApi:
             with open(file["name"], "rb") as f:
                 response = put(url, files={"file": f})
                 print("UPLOAD RESOPNSE", response, response.json())
+                responses.append(
+                    UploadFiles.UploadFileResponse.from_api_response(response.json())
+                )
 
-        return UploadFiles.UploadFileResponse(False)
+        return responses
 
     async def delete_files(
         self,

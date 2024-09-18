@@ -139,7 +139,13 @@ class UploadFiles:
 
     @dataclass
     class UploadFileResponse:
-        success: bool
+        url: str
+
+        @classmethod
+        def from_api_response(
+            cls, api_response: dict
+        ) -> "UploadFiles.UploadFileResponse":
+            return UploadFiles.UploadFileResponse(url=api_response["url"])
 
 
 #
