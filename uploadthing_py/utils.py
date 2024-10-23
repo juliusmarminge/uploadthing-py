@@ -44,8 +44,6 @@ def shuffle(string, seed):
     seed_num = hash_string(seed)
 
     for i in range(len(chars)):
-        # use math.fmod instead of %
-        # to avoid negative numbers
         j = int(math.fmod(math.fmod(seed_num, i + 1) + i, len(chars)))
         chars[i], chars[j] = chars[j], chars[i]
 
