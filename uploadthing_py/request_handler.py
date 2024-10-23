@@ -1,15 +1,21 @@
 from fastapi import Request, Response
 from httpx import AsyncClient
-from uploadthing_py.utils import json_stringify, sign_payload, verify_signature
+from uploadthing_py.utils import (
+    json_stringify,
+    sign_payload,
+    verify_signature,
+    generate_key,
+    generate_signed_url,
+)
 from uploadthing_py.builder import UploadThingBuilder
-import asyncio
+from asyncio import create_task, sleep
 from uploadthing_py.types import (
     UploadRequest,
     CallbackRequest,
     CompleteMPURequest,
-    FailureRequest,
+    UploadThingToken,
 )
-from typing import Union
+import typing as t
 
 
 def extract_router_config(router: dict[str, UploadThingBuilder]):
@@ -44,7 +50,7 @@ def extract_router_config(router: dict[str, UploadThingBuilder]):
     return routes
 
 
-async def dev_hook(presigned: dict, api_key: str):
+async def dev_hook(presigned: dict, token: UploadThingToken):
     retry_delay = 40e-3
     async with AsyncClient() as client:
         while True:
@@ -52,7 +58,7 @@ async def dev_hook(presigned: dict, api_key: str):
                 presigned["pollingUrl"],
                 headers={
                     "Authorization": presigned["pollingJwt"],
-                    "x-uploadthing-api-key": api_key,
+                    "x-uploadthing-api-key": token.api_key,
                     "x-uploadthing-version": "6.10.0",
                 },
             )
@@ -60,7 +66,7 @@ async def dev_hook(presigned: dict, api_key: str):
             if polling_data["status"] == "done":
                 print("[DEV_HOOK] Polling done")
                 break
-            await asyncio.sleep(retry_delay)
+            await sleep(retry_delay)
             retry_delay *= 2
 
         file = polling_data["file"]
@@ -80,7 +86,7 @@ async def dev_hook(presigned: dict, api_key: str):
             }
         )
 
-        signature = sign_payload(payload, api_key)
+        signature = sign_payload(payload, token.api_key)
 
         callback_response = await client.post(
             callback_url,
@@ -101,8 +107,9 @@ async def handle_upload_request(
     request: Request,
     body: UploadRequest,
     slug: str,
-    api_key: str,
+    token: UploadThingToken,
     is_dev: bool,
+    callback_url: str | None = None,
 ):
     # Run middleware to verify permission to upload
     try:
@@ -111,7 +118,9 @@ async def handle_upload_request(
         print("Middleware error", e)
         return {"error": "Unauthorized"}
 
-    callback_url = f"{request.url.scheme}://{request.url.netloc}{request.url.path}"
+    callback_url = (
+        callback_url or f"{request.url.scheme}://{request.url.netloc}{request.url.path}"
+    )
     files = [
         {
             "name": file.name,
@@ -128,46 +137,74 @@ async def handle_upload_request(
         for file in body.files
     ]
 
-    payload = json_stringify(
-        {
-            "files": files,
-            "metadata": metadata,
-            "callbackUrl": callback_url,
-            "callbackSlug": slug,
+    ingest_url = f"https://{token.regions[0]}.{token.ingest_host}"
+
+    presigned_urls: t.List[t.Dict[str, str]] = []
+    for file in files:
+        key = generate_key(file, token.app_id)
+        url = f"{ingest_url}/{key}"
+        data = {
+            "x-ut-identifier": token.app_id,
+            "x-ut-file-name": file["name"],
+            "x-ut-file-size": file["size"],
+            "x-ut-file-type": file["type"],
+            # "x-ut-custom-id": None,
+            "x-ut-content-disposition": file["contentDisposition"],
+            "x-ut-acl": file["acl"] if "acl" in file else "public-read",
         }
-    )
-    async with AsyncClient() as client:
-        response = await client.post(
-            "https://api.uploadthing.com/v7/prepareUpload",
-            content=payload,
-            headers={
-                "x-uploadthing-api-key": api_key,
-                "x-uploadthing-be-adapter": "uploadthing.py@",
-                "x-uploadthing-version": "6.10.0",
-                "Content-Type": "application/json",
-            },
+        signed_url = generate_signed_url(url, token.api_key, data=data)
+        presigned_urls.append(
+            {"url": signed_url, "key": key, "customId": None, "name": file["name"]}
         )
-        print("[PRESIGNEDS]", response.status_code, response.text)
-        if response.status_code != 200:
-            return {"error": "Failed to get presigned URLs"}
 
-        presigned_urls = response.json()["data"]
+    # TODO: Dev hook
 
-        if is_dev:
-            asyncio.gather(
-                *[dev_hook(presigned, api_key) for presigned in presigned_urls]
-            )
+    async def register_upload():
+        payload = json_stringify(
+            {
+                "fileKeys": [url["key"] for url in presigned_urls],
+                "metadata": metadata,
+                "isDev": is_dev,
+                "callbackUrl": callback_url,
+                "callbackSlug": slug,
+                "awaitServerData": False,  # TODO: Add support
+            }
+        )
+        async with AsyncClient() as client:
+            print("[metadata request]: Sending payload", payload)
+            try:
+                response = await client.post(
+                    f"{ingest_url}/route-metadata",
+                    content=payload,
+                    headers={
+                        "x-uploadthing-api-key": token.api_key,
+                        "x-uploadthing-version": "7.0.0",
+                        "x-uploadthing-be-adapter": "uploadthing.py@",
+                        "Content-Type": "application/json",
+                    },
+                )
+                print("[metadata request]: Got response", response)
+            except Exception as e:
+                print("[metadata request]: Got error", e)
 
-        return presigned_urls
+    # Register upload in background
+    create_task(register_upload())
+
+    print("Sending presigneds to client", presigned_urls)
+
+    return presigned_urls
 
 
 async def handle_callback_request(
-    uploader: UploadThingBuilder, request: Request, body: CallbackRequest, api_key: str
+    uploader: UploadThingBuilder,
+    request: Request,
+    body: CallbackRequest,
+    token: UploadThingToken,
 ):
     if not verify_signature(
         (await request.body()).decode("utf-8"),
         request.headers["x-uploadthing-signature"],
-        api_key,
+        token.api_key,
     ):
         return {"error": "Invalid signature"}
 
@@ -186,7 +223,7 @@ async def handle_callback_request(
             content=payload,
             headers={
                 "Content-Type": "application/json",
-                "x-uploadthing-api-key": api_key,
+                "x-uploadthing-api-key": token.api_key,
                 "x-uploadthing-version": "6.10.0",
             },
         )
@@ -195,54 +232,11 @@ async def handle_callback_request(
         return {"success": True}
 
 
-async def handle_complete_mpu_request(body: CompleteMPURequest, api_key: str):
-    async with AsyncClient() as client:
-        response = await client.post(
-            "https://api.uploadthing.com/v6/completeMultipart",
-            content=body.model_dump_json(),
-            headers={
-                "Content-Type": "application/json",
-                "x-uploadthing-api-key": api_key,
-                "x-uploadthing-version": "6.10.0",
-            },
-        )
-        print("[MPU COMPLETE]", response.status_code, response.text)
-
-        return {"success": True}
-
-
-async def handle_failure_request(
-    uploader: UploadThingBuilder, body: FailureRequest, api_key: str
-):
-    payload = json_stringify(
-        {
-            "fileKey": body.fileKey,
-            "uploadId": body.uploadId,
-        }
-    )
-    async with AsyncClient() as client:
-        response = await client.post(
-            "https://api.uploadthing.com/v6/failureCallback",
-            content=payload,
-            headers={
-                "Content-Type": "application/json",
-                "x-uploadthing-api-key": api_key,
-                "x-uploadthing-version": "6.10.0",
-            },
-        )
-        print("[MPU FAILURE]", response.status_code, response.text)
-
-    try:
-        uploader.callbacks["on_upload_error"](file_key=body.fileKey)
-    except Exception as e:
-        print("on_upload_error error", e)
-        return {"error": "Failed to run error callback"}
-
-    return {"success": True}
-
-
 def create_route_handler(
-    router: dict[str, UploadThingBuilder], api_key: str, is_dev: bool
+    router: dict[str, UploadThingBuilder],
+    token: str,
+    is_dev: bool,
+    callback_url: str | None = None,
 ):
     """
     Create request handlers for client side uploads
@@ -316,9 +310,9 @@ def create_route_handler(
     async def ut_post(
         request: Request,
         response: Response,
-        body: Union[UploadRequest, CallbackRequest, CompleteMPURequest],
+        body: t.Union[UploadRequest, CallbackRequest, CompleteMPURequest],
     ):
-        if not api_key:
+        if not token:
             response.status_code = 500
             return {"error": "No API key provided"}
 
@@ -343,10 +337,12 @@ def create_route_handler(
             else None
         )
 
+        decoded_token = UploadThingToken.parse(token)
+
         match [uploadthing_hook, action_type]:
             case ["callback", None]:
                 return await handle_callback_request(
-                    uploader=uploader, request=request, body=body, api_key=api_key
+                    uploader=uploader, request=request, body=body, token=decoded_token
                 )
             case [None, "upload"]:
                 return await handle_upload_request(
@@ -354,15 +350,10 @@ def create_route_handler(
                     request=request,
                     body=body,
                     slug=slug,
-                    api_key=api_key,
+                    token=decoded_token,
                     is_dev=is_dev,
+                    callback_url=callback_url,
                 )
-            case [None, "failure"]:
-                return await handle_failure_request(
-                    uploader=uploader, body=body, api_key=api_key
-                )
-            case [None, "multipart-complete"]:
-                return await handle_complete_mpu_request(body=body, api_key=api_key)
             case _:
                 response.status_code = 400
                 return {
