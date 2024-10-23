@@ -1,9 +1,10 @@
 import dataclasses
 import json
+import math
 import typing as t
 import hmac
 from hashlib import sha256
-from sqids import Sqids
+from sqids import Sqids, constants
 import time
 import urllib.parse
 
@@ -38,12 +39,32 @@ def del_none(d: t.Any):
 signature_prefix = "hmac-sha256="
 
 
+def shuffle(string, seed):
+    chars = list(string)
+    seed_num = hash_string(seed)
+
+    for i in range(len(chars)):
+        # use math.fmod instead of %
+        # to avoid negative numbers
+        j = int(math.fmod(math.fmod(seed_num, i + 1) + i, len(chars)))
+        chars[i], chars[j] = chars[j], chars[i]
+
+    return "".join(chars)
+
+
 def hash_string(s):
     h = 5381
     for char in reversed(s):
         h = (h * 33) ^ ord(char)
+        # 32-bit integer overflow
+        h &= 0xFFFFFFFF
+    h = (h & 0xBFFFFFFF) | ((h >> 1) & 0x40000000)
 
-    return (h & 0xBFFFFFFF) | ((h >> 1) & 0x40000000)
+    # Convert to signed 32-bit integer
+    if h >= 0x80000000:
+        h -= 0x100000000
+
+    return h
 
 
 def sign_payload(payload: str, secret: str) -> str:
@@ -64,10 +85,13 @@ def verify_signature(payload: str, signature: str, secret: str) -> bool:
 
 
 def generate_key(file, app_id: str) -> str:
-    file_seed = Sqids(min_length=36).encode(
+    alphabet = shuffle(constants.DEFAULT_ALPHABET, app_id)
+
+    file_seed = Sqids(alphabet, min_length=36).encode(
         [abs(hash_string(f"{json_stringify(file)}{time.time()}"))]
     )
-    return app_id + file_seed
+    encoded_app_id = Sqids(alphabet, min_length=12).encode([abs(hash_string(app_id))])
+    return encoded_app_id + file_seed
 
 
 def generate_signed_url(
