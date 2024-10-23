@@ -41,7 +41,7 @@ upload_router = {
 }
 handlers = create_route_handler(
     router=upload_router,
-    api_key=os.getenv("UPLOADTHING_SECRET"),
+    token=os.getenv("UPLOADTHING_TOKEN"),
     is_dev=os.getenv("ENVIRONMENT", "development") == "development",
 )
 

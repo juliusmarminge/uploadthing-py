@@ -848,6 +848,17 @@ files = [
 ]
 
 [[package]]
+name = "sqids"
+version = "0.5.0"
+description = "Generate YouTube-like ids from numbers."
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "sqids-0.5.0-py3-none-any.whl", hash = "sha256:4c2d1eabf4721e6e18001b1ff2bc0b30d059447ef96f1e1d1fb7f56841814154"},
+    {file = "sqids-0.5.0.tar.gz", hash = "sha256:647798e7d5bfeb236e7ac4709cfd4cd808630a6c50f80205df17b4c93e560140"},
+]
+
+[[package]]
 name = "starlette"
 version = "0.37.2"
 description = "The little ASGI library that shines."
@@ -1219,4 +1230,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "c4fb8ab22da1b0d973464ea90e863de7c4e3845b4bf71105c212ae790ad7d4b0"
+content-hash = "f47f3f2584a2a3d0d5bb810b4c705eed308ad79a8ef16255daa2d1f3e3dec611"

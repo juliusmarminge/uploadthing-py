@@ -1,10 +1,32 @@
-from typing import Any, Literal, Union, TypedDict
+from typing import Any, Literal, Union, TypedDict, Dict
 from dataclasses import dataclass
 from pydantic import BaseModel
+from uploadthing_py.utils import json_parse
+from base64 import b64decode
 
 type MaybeList[T] = Union[list[T], T]
 
 type ACL = Literal["public-read", "private"]
+
+
+@dataclass
+class UploadThingToken:
+    api_key: str
+    app_id: str
+    regions: list[str]
+    ingest_host: str | None = "ingest.uploadthing.com"
+
+    @classmethod
+    def parse(cls, token: str) -> "UploadThingToken":
+        decoded_token: Dict[str, str] = json_parse(b64decode(token).decode("utf-8"))
+        return UploadThingToken(
+            api_key=decoded_token["apiKey"],
+            app_id=decoded_token["appId"],
+            regions=decoded_token["regions"],
+            ingest_host=decoded_token["ingestHost"]
+            if "ingestHost" in decoded_token
+            else "ingest.uploadthing.com",
+        )
 
 
 #
@@ -130,6 +152,22 @@ class UpdateACL:
     @dataclass
     class UpdateACLResponse:
         success: bool
+
+
+class UploadFiles:
+    class UploadFileOptions(KeyTypeOptions):
+        content_disposition: str | None = None
+        acl: ACL | None = None
+
+    @dataclass
+    class UploadFileResponse:
+        url: str
+
+        @classmethod
+        def from_api_response(
+            cls, api_response: dict
+        ) -> "UploadFiles.UploadFileResponse":
+            return UploadFiles.UploadFileResponse(url=api_response["url"])
 
 
 #
