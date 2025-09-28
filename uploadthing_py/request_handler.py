@@ -44,57 +44,26 @@ def extract_router_config(router: dict[str, UploadThingBuilder]):
     return routes
 
 
-async def dev_hook(presigned: dict, api_key: str):
-    retry_delay = 40e-3
+async def upload_metadata(presigned: dict, api_key: str, callback: dict):
     async with AsyncClient() as client:
-        while True:
-            response = await client.get(
-                presigned["pollingUrl"],
-                headers={
-                    "Authorization": presigned["pollingJwt"],
-                    "x-uploadthing-api-key": api_key,
-                    "x-uploadthing-version": "6.10.0",
-                },
-            )
-            polling_data = response.json()
-            if polling_data["status"] == "done":
-                print("[DEV_HOOK] Polling done")
-                break
-            await asyncio.sleep(retry_delay)
-            retry_delay *= 2
-
-        file = polling_data["file"]
-        callback_url = f"{file['callbackUrl']}?slug={file['callbackSlug']}"
-        payload = json_stringify(
-            {
-                "status": "uploaded",
-                "metadata": polling_data["metadata"],
-                "file": {
-                    "url": file["fileUrl"],
-                    "key": file["fileKey"],
-                    "name": file["fileName"],
-                    "size": file["fileSize"],
-                    "custom_id": file["customId"],
-                    "type": file["fileType"],
-                },
-            }
-        )
-
-        signature = sign_payload(payload, api_key)
-
-        callback_response = await client.post(
-            callback_url,
-            content=payload,
+        # TODO: add support for url regions
+        await client.post(
+            "https://sea1.ingest.uploadthing.com/route-metadata",
             headers={
-                "Content-Type": "application/json",
-                "uploadthing-hook": "callback",
-                "x-uploadthing-signature": signature,
+                "content-type": "application/json",
+                "x-uploadthing-api-key": api_key,
             },
+            content=json_stringify({
+                "fileKeys": [presigned["key"]],
+                "metadata": {
+                    "uploadedBy": "user_id",
+                },
+                "callbackUrl": callback["url"],
+                "callbackSlug": callback["slug"],
+                "awaitServerData": callback["awaitServerData"],
+                "isDev": False,
+            }),
         )
-        print(
-            "[DEV_HOOK CALLBACK]", callback_response.status_code, callback_response.text
-        )
-
 
 async def handle_upload_request(
     uploader: UploadThingBuilder,
@@ -111,51 +80,50 @@ async def handle_upload_request(
         print("Middleware error", e)
         return {"error": "Unauthorized"}
 
-    callback_url = f"{request.url.scheme}://{request.url.netloc}{request.url.path}"
     files = [
         {
-            "name": file.name,
-            "size": file.size,
-            "type": file.type,
-            "customId": None,  # (TODO) Add support
-            "contentDisposition": (
-                uploader.config["content-disposition"]
-                if "content-disposition" in uploader.config
-                else "inline"
-            ),
-            **({"acl": uploader.config["acl"]} if "acl" in uploader.config else {}),
+            "fileName": file.name,
+            "fileSize": file.size,
+            "slug": slug,
+            "fileType": file.type,
+            # "contentDisposition": (
+            #     uploader.config["content-disposition"]
+            #     if "content-disposition" in uploader.config
+            #     else "inline"
+            # ),
+            # **({"acl": uploader.config["acl"]} if "acl" in uploader.config else {}),
         }
         for file in body.files
     ]
 
-    payload = json_stringify(
-        {
-            "files": files,
-            "metadata": metadata,
-            "callbackUrl": callback_url,
-            "callbackSlug": slug,
-        }
-    )
+    presigned_urls = []
+
     async with AsyncClient() as client:
-        response = await client.post(
+        response = await asyncio.gather(*[client.post(
             "https://api.uploadthing.com/v7/prepareUpload",
-            content=payload,
+            content=json_stringify(file),
             headers={
                 "x-uploadthing-api-key": api_key,
                 "x-uploadthing-be-adapter": "uploadthing.py@",
-                "x-uploadthing-version": "6.10.0",
                 "Content-Type": "application/json",
             },
-        )
-        print("[PRESIGNEDS]", response.status_code, response.text)
-        if response.status_code != 200:
-            return {"error": "Failed to get presigned URLs"}
+        ) for file in files])
 
-        presigned_urls = response.json()["data"]
+        presigned_urls = [r.json() for r in response]
+
+        callback_url = f"{request.url.scheme}://{request.url.netloc}{request.url.path}"
+
+        callback = {
+            "url": callback_url,
+            "slug": slug,
+            "awaitServerData": False,
+            "isDev": is_dev,
+        }
 
         if is_dev:
+            # dev_hook(presigned_urls, api_key)
             asyncio.gather(
-                *[dev_hook(presigned, api_key) for presigned in presigned_urls]
+                *[upload_metadata(presigned, api_key, callback) for presigned in presigned_urls]
             )
 
         return presigned_urls
