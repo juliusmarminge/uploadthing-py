@@ -5,6 +5,7 @@ from pydantic import BaseModel
 type MaybeList[T] = Union[list[T], T]
 
 type ACL = Literal["public-read", "private"]
+type ContentDisposition = Literal["inline", "attachment"]
 
 
 #
@@ -88,6 +89,16 @@ class RenameFiles:
     @dataclass
     class RenameFileResponse:
         success: bool
+        renamed_count: int = 0
+
+        @classmethod
+        def from_api_response(
+            cls, api_response: dict
+        ) -> "RenameFiles.RenameFileResponse":
+            return RenameFiles.RenameFileResponse(
+                success=api_response.get("success", True),
+                renamed_count=api_response.get("renamedCount", 0),
+            )
 
 
 class GetUsageInfo:
@@ -130,6 +141,83 @@ class UpdateACL:
     @dataclass
     class UpdateACLResponse:
         success: bool
+        updated_count: int = 0
+
+        @classmethod
+        def from_api_response(
+            cls, api_response: dict
+        ) -> "UpdateACL.UpdateACLResponse":
+            return UpdateACL.UpdateACLResponse(
+                success=api_response.get("success", True),
+                updated_count=api_response.get("updatedCount", 0),
+            )
+
+
+class UploadFiles:
+    @dataclass
+    class UploadFilesOptions:
+        content_disposition: ContentDisposition = "inline"
+        acl: ACL | None = None
+        concurrency: int = 1
+
+    @dataclass
+    class UploadedFile:
+        """Represents a successfully uploaded file."""
+
+        key: str
+        url: str
+        app_url: str
+        ufs_url: str
+        name: str
+        size: int
+        type: str
+        custom_id: str | None
+        file_hash: str
+        last_modified: int
+
+        @classmethod
+        def from_api_response(cls, api_response: dict) -> "UploadFiles.UploadedFile":
+            return UploadFiles.UploadedFile(
+                key=api_response["key"],
+                url=api_response.get("url", ""),
+                app_url=api_response.get("appUrl", ""),
+                ufs_url=api_response.get("ufsUrl", ""),
+                name=api_response["name"],
+                size=api_response["size"],
+                type=api_response["type"],
+                custom_id=api_response.get("customId"),
+                file_hash=api_response.get("fileHash", ""),
+                last_modified=api_response.get("lastModified", 0),
+            )
+
+    @dataclass
+    class UploadError:
+        """Represents an upload error."""
+
+        code: str
+        message: str
+        data: Any = None
+
+    @dataclass
+    class UploadResult:
+        """Result of an upload operation - either success or error."""
+
+        data: "UploadFiles.UploadedFile | None" = None
+        error: "UploadFiles.UploadError | None" = None
+
+        @property
+        def is_success(self) -> bool:
+            return self.data is not None and self.error is None
+
+
+class GenerateSignedUrl:
+    @dataclass
+    class GenerateSignedUrlOptions:
+        expires_in: int | None = None  # seconds
+
+    @dataclass
+    class GenerateSignedUrlResponse:
+        ufs_url: str
 
 
 #
@@ -183,3 +271,4 @@ class FailureRequest(BaseModel):
 UploadThingRequestBody = Union[
     UploadRequest, CallbackRequest, CompleteMPURequest, FailureRequest
 ]
+
