@@ -15,6 +15,7 @@ import uploadthing_py
 from uploadthing_py.config import UTConfig, get_config_from_env, ConfigError
 from uploadthing_py.ut_file import UTFile
 
+UPLOADTHING_VERSION = "7.7.4"   
 from uploadthing_py.types import (
     ACL,
     ContentDisposition,
@@ -88,7 +89,7 @@ class UTApi:
             headers={
                 "x-uploadthing-api-key": self._config.api_key,
                 "x-uploadthing-be-adapter": f"uploadthing_py@{uploadthing_py.__version__}",
-                "x-uploadthing-version": "7.7.4",
+                "x-uploadthing-version": UPLOADTHING_VERSION,
             },
         )
         self._default_key_type = key_type
@@ -154,30 +155,28 @@ class UTApi:
             self._logger.debug(f"Uploading file {file.name} to {presigned_url[:100]}...")
 
             # Upload the file via HTTP PUT with FormData (matching TypeScript SDK)
-            async with AsyncClient() as upload_client:
-                files = {"file": (file.name, file.content, file.content_type)}
-                response = await upload_client.put(
-                    presigned_url,
-                    files=files,
-                    headers={
-                        "Range": "bytes=0-",
-                        "x-uploadthing-version": "6.10.0",
-                    },
-                    timeout=300.0,  # 5 minute timeout for large files
-                )
+            files = {"file": (file.name, file.content, file.content_type)}
+            response = await self._client.put(
+                presigned_url,
+                files=files,
+                headers={
+                    "Range": "bytes=0-",
+                },
+                timeout=300.0,  # 5 minute timeout for large files
+            )
 
-                if response.status_code != 200:
-                    self._logger.error(f"Upload failed: {response.status_code} {response.text}")
-                    return UploadFiles.UploadResult(
-                        error=UploadFiles.UploadError(
+            if response.status_code != 200:
+                self._logger.error(f"Upload failed: {response.status_code} {response.text}")
+                return UploadFiles.UploadResult(
+                    error=UploadFiles.UploadError(
                             code="UPLOAD_FAILED",
                             message=f"Upload failed with status {response.status_code}",
                             data=response.text,
                         )
                     )
 
-                # Parse response
-                result = response.json()
+            # Parse response
+            result = response.json()
 
             # Build file URLs
             ufs_url = f"https://{self._config.app_id}.{self._config.ufs_host}/f/{key}"
