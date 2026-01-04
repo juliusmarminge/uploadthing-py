@@ -13,6 +13,7 @@
 .python-version
 .vscode/*
 
+.env
 /docs/site/*
 .mypy_cache
 

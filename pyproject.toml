@@ -11,7 +11,8 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = "^3.12"
 httpx = "^0.27.0"
-pydantic = "^2.7.1"
+pydantic = "^2.12.1"
+sqids = "^0.5.2"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -31,3 +32,6 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 log_cli = true
+filterwarnings = [
+    "ignore:Please use `import python_multipart`:PendingDeprecationWarning",
+]
