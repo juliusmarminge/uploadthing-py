@@ -5,9 +5,11 @@ import hmac
 import time
 import base64
 import uuid
+import os
 from hashlib import sha256
 from urllib.parse import urlencode
-
+from sqids import Sqids
+from sqids.constants import DEFAULT_ALPHABET
 
 def json_stringify(o):
     class EnhancedJSONEncoder(json.JSONEncoder):
@@ -98,12 +100,7 @@ def generate_key(file_name: str, file_size: int, file_type: str, app_id: str, la
     Returns:
         A unique file key that the UploadThing server will accept
     """
-    from sqids import Sqids
-    from sqids.constants import DEFAULT_ALPHABET
-    import base64
-    import time
-    import os
-    
+
     # Shuffle alphabet based on app_id (matching UploadThing docs reference)
     alphabet = _shuffle_alphabet(DEFAULT_ALPHABET, app_id)
     
@@ -127,70 +124,27 @@ def generate_signed_url(
 ) -> str:
     """
     Generate a presigned URL with HMAC-SHA256 signature.
-
-    This matches the TypeScript SDK's signing approach:
-    1. Append expires timestamp as query param
-    2. Append all data fields as individual query params
-    3. Sign the entire URL with HMAC-SHA256
-    4. Append signature as final query param
-
-    Args:
-        base_url: The base URL to sign (e.g., ingest URL or file URL)
-        api_key: The UploadThing API key for signing
-        data: Optional additional data to include as query params
-        ttl_seconds: Time-to-live in seconds (default: 5 minutes)
-
-    Returns:
-        The full signed URL with query parameters
+    
+    Matches the TypeScript SDK's simple approach:
+    1. Add expires param to URL
+    2. Sign the entire URL string with HMAC-SHA256
+    3. Append signature param
     """
-    from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode as url_encode
+    from urllib.parse import urlencode
     
-    # Parse the base URL
-    parsed = urlparse(base_url)
-    
-    # Start with existing query params (if any)
-    params = parse_qsl(parsed.query)
-    
-    # Add expires timestamp (in milliseconds, matching TS SDK)
-    expires_ms = int((time.time() + ttl_seconds) * 1000)
-    params.append(("expires", str(expires_ms)))
-    
-    # Add all data fields as individual query params
+    # Build query params
+    params = {"expires": str(int((time.time() + ttl_seconds) * 1000))}
     if data:
-        for key, value in data.items():
-            if value is not None:
-                # URL encode the value
-                params.append((key, str(value)))
+        params.update({k: str(v) for k, v in data.items() if v is not None})
     
-    # Build the URL without signature for signing
-    url_without_sig = urlunparse((
-        parsed.scheme,
-        parsed.netloc,
-        parsed.path,
-        parsed.params,
-        url_encode(params),
-        parsed.fragment,
-    ))
+    # Build URL with params (before signature)
+    separator = "&" if "?" in base_url else "?"
+    url_to_sign = f"{base_url}{separator}{urlencode(params)}"
     
-    # Sign the entire URL with HMAC-SHA256
-    signature = hmac.new(
-        api_key.encode(),
-        url_without_sig.encode(),
-        sha256,
-    ).hexdigest()
+    # Sign the URL
+    signature = hmac.new(api_key.encode(), url_to_sign.encode(), sha256).hexdigest()
     
-    # Add signature as final query param (with prefix matching TS SDK)
-    params.append(("signature", f"hmac-sha256={signature}"))
     
-    # Build the final URL
-    final_url = urlunparse((
-        parsed.scheme,
-        parsed.netloc,
-        parsed.path,
-        parsed.params,
-        url_encode(params),
-        parsed.fragment,
-    ))
-    
-    return final_url
+    # Return URL with signature appended
+    return f"{url_to_sign}&signature=hmac-sha256={signature}"
 

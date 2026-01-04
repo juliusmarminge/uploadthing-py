@@ -88,7 +88,7 @@ class UTApi:
             headers={
                 "x-uploadthing-api-key": self._config.api_key,
                 "x-uploadthing-be-adapter": f"uploadthing_py@{uploadthing_py.__version__}",
-                "x-uploadthing-version": "6.10.0",
+                "x-uploadthing-version": "7.7.4",
             },
         )
         self._default_key_type = key_type
